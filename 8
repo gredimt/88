@@ -1,0 +1,269 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace EnterpriseManagementSystem
+{
+   // Класс Администратора
+    public class Administrator : User
+    {
+        public Administrator()
+        {
+            Role = "Administrator";
+        }
+    }
+
+
+    // Базовый класс пользователя
+    public abstract class User
+    {
+        public string FullName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string Login { get; set; }
+        public string Password { get; set; }
+        public string Role { get; set; }
+
+        public virtual void WriteToBinary(BinaryWriter writer)
+        {
+            writer.Write(FullName);
+            writer.Write(BirthDate.ToBinary());
+            writer.Write(Login);
+            writer.Write(Password);
+            writer.Write(Role);
+        }
+
+
+        public virtual void ReadFromBinary(BinaryReader reader)
+        {
+            FullName = reader.ReadString();
+            BirthDate = DateTime.FromBinary(reader.ReadInt64());
+            Login = reader.ReadString();
+            Password = reader.ReadString();
+            Role = reader.ReadString();
+        }
+    }
+
+    // Пользователь: Кадры
+    public class HR : User
+    {
+        public HR()
+        {
+            Role = "HR";
+        }
+    }
+
+    // Пользователь: Склад
+    public class Warehouse : User
+    {
+        public Warehouse()
+        {
+            Role = "Warehouse";
+        }
+    }
+
+    // Пользователь: Касса-продавец
+    public class Cashier : User
+    {
+        public Cashier()
+        {
+            Role = "Cashier";
+        }
+    }
+
+    // Пользователь: Бухгалтерия
+    public class Accounting : User
+    {
+        public Accounting()
+        {
+            Role = "Accounting";
+        }
+    }
+
+    // Пользователь: Покупатель
+    public class Customer : User
+    {
+        public Customer()
+        {
+            Role = "Customer";
+        }
+    }
+
+    // Основной класс программы
+    class Program
+    {
+        private static string usersFilePath = "users.dat";
+        private static List<User> users = new List<User>();
+
+        static void Main(string[] args)
+        {
+            Initialize();
+            MainMenu();
+        }
+
+        static void Initialize()
+        {
+            if (!File.Exists(usersFilePath))
+            {
+                Console.WriteLine("Файл пользователей не найден. Создаётся аккаунт администратора.");
+                CreateAdminAccount();
+            }
+            else
+            {
+                LoadUsers();
+            }
+        }
+
+        static void CreateAdminAccount()
+        {
+            Console.WriteLine("Введите ФИО администратора:");
+            string fullName = Console.ReadLine();
+            Console.WriteLine("Введите логин:");
+            string login = Console.ReadLine();
+            string password = PromptPassword("Введите пароль:");
+
+            var admin = new Administrator
+            {
+                FullName = fullName,
+                Login = login,
+                Password = password,
+                BirthDate = DateTime.Now // временное значение
+            };
+
+            users.Add(admin);
+            SaveUsers();
+        }
+
+        static void MainMenu()
+        {
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("Добро пожаловать в систему управления предприятием.");
+                Console.WriteLine("1. Вход");
+                Console.WriteLine("2. Выход");
+                ConsoleKey choice = Console.ReadKey(true).Key;
+
+                if (choice == ConsoleKey.D1)
+                {
+                    Login();
+                }
+                else if (choice == ConsoleKey.D2)
+                {
+                    Environment.Exit(0);
+                }
+            }
+        }
+
+        static void Login()
+        {
+            Console.Clear();
+            Console.WriteLine("Введите логин:");
+            string login = Console.ReadLine();
+            string password = PromptPassword("Введите пароль:");
+
+            var user = users.Find(u => u.Login == login && u.Password == password);
+            if (user != null)
+            {
+                Console.WriteLine($"Добро пожаловать, {user.FullName}!");
+                Console.WriteLine($"Ваша роль: {user.Role}");
+                switch (user.Role)
+                {
+                    case "Administrator":
+                        AdminMenu();
+                        break;
+                    case "HR":
+                        HRMenu();
+                        break;
+                    case "Warehouse":
+                        WarehouseMenu();
+                        break;
+                    case "Cashier":
+                        CashierMenu();
+                        break;
+                    case "Accounting":
+                        AccountingMenu();
+                        break;
+                    case "Customer":
+                        CustomerMenu();
+                        break;
+                }
+            }
+            else
+            {
+                Console.WriteLine("Неверный логин или пароль.");
+                Console.ReadKey();
+            }
+        }
+
+        static string PromptPassword(string prompt)
+        {
+            Console.WriteLine(prompt);
+            string password = "";
+            while (true)
+            {
+                ConsoleKeyInfo key = Console.ReadKey(true);
+                if (key.Key == ConsoleKey.Enter) break;
+                if (key.Key == ConsoleKey.Backspace && password.Length > 0)
+                {
+                    password = password.Substring(0, password.Length - 1);
+                    Console.Write("\b \b");
+                }
+                else if (key.Key != ConsoleKey.Backspace)
+                {
+                    password += key.KeyChar;
+                    Console.Write("*");
+                }
+            }
+            Console.WriteLine();
+            return password;
+        }
+
+        static void SaveUsers()
+        {
+            using (FileStream fs = new FileStream(usersFilePath, FileMode.Create))
+            using (BinaryWriter writer = new BinaryWriter(fs))
+            {
+                writer.Write(users.Count);
+                foreach (var user in users)
+                {
+                    writer.Write(user.Role);
+                    user.WriteToBinary(writer);
+                }
+            }
+        }
+
+        static void LoadUsers()
+        {
+            using (FileStream fs = new FileStream(usersFilePath, FileMode.Open))
+            using (BinaryReader reader = new BinaryReader(fs))
+            {
+                int userCount = reader.ReadInt32();
+                for (int i = 0; i < userCount; i++)
+                {
+                    string role = reader.ReadString();
+                    User user = role switch
+                    {
+                        "Administrator" => new Administrator(),
+                        "HR" => new HR(),
+                        "Warehouse" => new Warehouse(),
+                        "Cashier" => new Cashier(),
+                        "Accounting" => new Accounting(),
+                        "Customer" => new Customer(),
+                        _ => null
+                    };
+
+                    user?.ReadFromBinary(reader);
+                    if (user != null) users.Add(user);
+                }
+            }
+        }
+
+        static void AdminMenu() => Console.WriteLine("Меню администратора"); // Реализовать функционал
+        static void HRMenu() => Console.WriteLine("Меню кадров"); // Реализовать функционал
+        static void WarehouseMenu() => Console.WriteLine("Меню склада"); // Реализовать функционал
+        static void CashierMenu() => Console.WriteLine("Меню кассира-продавца"); // Реализовать функционал
+        static void AccountingMenu() => Console.WriteLine("Меню бухгалтерии"); // Реализовать функционал
+        static void CustomerMenu() => Console.WriteLine("Меню покупателя"); // Реализовать функционал
+    }
+}
